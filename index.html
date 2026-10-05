@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Steady</title>
+<meta name="description" content="Pace your reading and workbook pages to a deadline.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Steady">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#F4F6F5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E1514" media="(prefers-color-scheme: dark)">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<style>
+/* ---------- Colour tokens (light, then dark) ---------- */
+:root {
+  --bg: #F4F6F5;  --card: #FFFFFF;  --text: #13201F;  --muted: #5D6B69;  --line: #E1E7E5;
+  --brand: #145E58;  --brand-ink: #FFFFFF;  --link: #145E58;  --track: #E4EBE9;
+  --ahead: #2E9D6A;  --ontrack: #1F7A72;  --behind: #D9822B;  --late: #C2453D;  --gold: #E3A92F;
+  --marker: #13201F;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 4px 14px rgba(0,0,0,.04);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0E1514;  --card: #172120;  --text: #E7EFED;  --muted: #92A3A0;  --line: #26332F;
+    --brand: #22756D;  --brand-ink: #FFFFFF;  --link: #6CC5BB;  --track: #24312E;
+    --ahead: #43B983;  --ontrack: #4FA39A;  --behind: #E59A45;  --late: #E06A60;  --gold: #F2C25B;
+    --marker: #E7EFED;
+    --shadow: none;
+  }
+}
+
+/* ---------- Base ---------- */
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.4 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums; min-height: 100vh; overscroll-behavior-y: none;
+}
+button { font: inherit; cursor: pointer; }
+.wrap { max-width: 560px; margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 14px) 16px calc(env(safe-area-inset-bottom) + 32px); }
+header.top { display: flex; justify-content: space-between; align-items: center; }
+h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+.date { color: var(--muted); font-size: 14px; }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; margin: 24px 0 10px; }
+h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0; }
+.link-btn { background: none; border: 0; color: var(--link); font-weight: 600; padding: 8px 4px; }
+.icon-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); display: grid; place-items: center; padding: 0; }
+.icon-btn.sm { width: 36px; height: 36px; border-radius: 10px; font-size: 18px; line-height: 1; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* ---------- Cards ---------- */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 18px;
+  padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+.empty p { margin: 0 0 14px; color: var(--muted); }
+.task-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.task-name { font-size: 18px; font-weight: 600; margin: 0; }
+.due { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.head-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.chip { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap;
+  color: var(--c); background: color-mix(in srgb, var(--c) 14%, transparent); }
+
+/* Progress bar: fill = work done, thin mark = where the plan says you should be tonight */
+.bar { position: relative; height: 14px; background: var(--track); border-radius: 999px; margin: 16px 0 6px; }
+.bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--c);
+  transition: width .6s ease, background-color .4s; }
+.bar .mark { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px;
+  border-radius: 2px; background: var(--marker); opacity: .55; }
+.bar-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+
+.stats { display: grid; grid-template-columns: 64px 1fr 1fr; gap: 12px; align-items: center; margin-top: 14px; }
+.stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.stat .v { font-size: 17px; font-weight: 600; }
+.ring { position: relative; width: 64px; height: 64px; }
+.ring svg { transform: rotate(-90deg); display: block; }
+.ring .bg { fill: none; stroke: var(--track); stroke-width: 6; }
+.ring .fg { fill: none; stroke: var(--c); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset .6s ease; }
+.ring.met .fg { stroke: var(--gold); }
+.ring .num { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.ring .num b { font-size: 14px; font-weight: 600; }
+.ring .num span { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+.msg { margin: 14px 0 0; font-size: 14px; line-height: 1.45; padding: 10px 12px; border-radius: 12px;
+  background: color-mix(in srgb, var(--c) 10%, transparent); }
+.actions { display: flex; gap: 8px; margin-top: 12px; }
+.actions:empty { display: none; }
+
+/* ---------- Buttons ---------- */
+.btn { appearance: none; border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 600; min-height: 46px; }
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .45; }
+.btn.primary { background: var(--brand); color: var(--brand-ink); flex: 1; }
+.btn.secondary { background: var(--track); color: var(--text); }
+.btn.wide { width: 100%; margin-top: 18px; }
+.btn.danger { background: none; color: var(--late); border: 1px solid var(--line); width: 100%; margin-top: 28px; }
+
+/* ---------- Chores ---------- */
+.chores { list-style: none; margin: 12px 0 0; padding: 0; }
+.chores li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.chore-name { flex: 1; text-align: left; background: none; border: 0; color: var(--text); padding: 6px 0; }
+.chores li.complete .chore-name { color: var(--muted); text-decoration: line-through; }
+.pips { display: flex; gap: 4px; }
+.pip { width: 10px; height: 10px; border-radius: 50%; background: var(--track); }
+.pip.on { background: var(--ahead); }
+.round { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card);
+  color: var(--text); font-size: 20px; line-height: 1; display: grid; place-items: center; padding: 0; }
+.round.plus { background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.round:disabled { opacity: .35; }
+
+/* ---------- Sheets (full-height panels, so the keyboard never hides the inputs) ---------- */
+#sheet-root { position: fixed; inset: 0; z-index: 50; display: none; }
+#sheet-root.open { display: block; }
+.overlay { position: absolute; inset: 0; background: rgba(0,0,0,.35); animation: fade .2s; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; top: calc(env(safe-area-inset-top) + 24px);
+  max-width: 560px; margin: 0 auto; background: var(--bg); border-radius: 20px 20px 0 0;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 24px); animation: rise .25s ease; }
+.sheet-head { position: sticky; top: 0; z-index: 1; background: var(--bg); display: grid;
+  grid-template-columns: 1fr auto 1fr; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.sheet-head h3 { margin: 0; font-size: 17px; font-weight: 600; }
+.sheet-head > :first-child { justify-self: start; }
+.sheet-head > :last-child { justify-self: end; }
+@keyframes rise { from { transform: translateY(40px); opacity: .5; } to { transform: none; opacity: 1; } }
+@keyframes fade { from { opacity: 0; } }
+
+.form label { display: block; font-size: 14px; font-weight: 500; color: var(--muted); margin-top: 16px; }
+.form input[type=text], .form input[type=number], .form input[type=date], .form textarea {
+  display: block; width: 100%; margin-top: 6px; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); font: inherit; font-size: 17px; -webkit-appearance: none; min-height: 48px; }
+.form input::-webkit-date-and-time-value { text-align: left; }
+.form input:focus, .form textarea:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+.form textarea { font-size: 13px; min-height: 90px; font-family: ui-monospace, monospace; }
+.form .big { font-size: 30px; font-weight: 600; text-align: center; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.opt { font-weight: 400; font-size: 12px; color: var(--muted); }
+.seg { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.seg label { margin: 0; position: relative; }
+.seg input { position: absolute; opacity: 0; }
+.seg span { display: block; text-align: center; padding: 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--card); color: var(--text); font-weight: 500; }
+.seg input:checked + span { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); }
+.preview { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 16px; font-size: 15px; }
+.preview:empty, .error:empty { display: none; }
+.error { color: var(--late); font-size: 14px; margin: 12px 0 0; }
+.quick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.quick button { min-height: 48px; border-radius: 12px; border: 1px solid var(--line); background: var(--card);
+  color: var(--text); font-weight: 600; }
+.check-row { display: flex !important; align-items: center; gap: 12px; padding: 12px; margin-top: 8px !important;
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px; color: var(--text) !important; }
+.check-row input { width: 22px; height: 22px; accent-color: var(--brand); margin: 0; }
+.help p { margin: 10px 0; font-size: 15px; line-height: 1.5; }
+.help h4 { margin: 24px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.legend { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
+
+/* ---------- Feedback ---------- */
+.toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translate(-50%, 20px);
+  opacity: 0; background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 999px; font-weight: 600;
+  font-size: 15px; transition: .25s; z-index: 70; pointer-events: none; width: max-content; max-width: 90vw; text-align: center; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 60; }
+.confetti i { position: absolute; top: -14px; width: 8px; height: 12px; border-radius: 2px; animation: fall 1.8s ease-in forwards; }
+@keyframes fall { to { transform: translate(var(--x), 105vh) rotate(var(--r)); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Steady</h1>
+      <div class="date" id="today-label"></div>
+    </div>
+    <button class="icon-btn" data-action="settings" aria-label="Settings and backup">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <line x1="4" y1="8" x2="20" y2="8"/><line x1="4" y1="16" x2="20" y2="16"/>
+        <circle cx="9" cy="8" r="2.6" fill="var(--card)"/><circle cx="15" cy="16" r="2.6" fill="var(--card)"/>
+      </svg>
+    </button>
+  </header>
+
+  <div class="section-head"><h2>Tasks</h2><button class="link-btn" data-action="add-task">+ Add</button></div>
+  <div id="tasks"></div>
+
+  <div class="section-head"><h2>This week</h2><button class="link-btn" data-action="add-chore">+ Add</button></div>
+  <div id="chores"></div>
+</div>
+
+<div id="sheet-root"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* =====================================================================
+   Steady: pace a book or workbook to a deadline, plus weekly chores.
+   All data lives in localStorage on this device.
+   ===================================================================== */
+
+/* ---------- Small helpers ---------- */
+const $ = sel => document.querySelector(sel);
+const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pl = (n, word) => `${n} ${n === 1 ? word : word + 's'}`;
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const hash = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; };
+const toInt = v => (v === '' || v == null || isNaN(+v)) ? null : Math.round(+v);
+
+/* ---------- Dates: always local 'YYYY-MM-DD' strings, never UTC ---------- */
+const pad = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayStr = () => ymd(new Date());
+const parse = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); }; // noon avoids DST edges
+const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
+const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
+const weekStart = s => { const d = parse(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return ymd(d); }; // Monday
+const fmt = (s, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => parse(s).toLocaleDateString('en-NZ', opts);
+
+/* ---------- Storage ---------- */
+const KEY = 'steady.v1';
+const blank = () => ({ version: 1, tasks: [], chores: [], choreLog: {}, lastOpen: null });
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY));
+    return s && s.version === 1 ? { ...blank(), ...s } : blank();
+  } catch { return blank(); }
+}
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(S)); }
+  catch { toast('Could not save: storage may be full.'); }
+}
+
+let S = load();
+let currentDay = todayStr();
+
+/* =====================================================================
+   The rate engine
+   - "pos" is the last page finished. Nothing done yet means pos = start - 1.
+   - Days left includes today; the deadline means "finished by the end of that day".
+   - Rest days are planned in advance: the rate assumes the student will use
+     every rest day still in the budget, so taking one never raises the rate.
+   - Today's target is fixed from the position at the start of the day
+     (t.day.startPos), so the goalpost doesn't move while working.
+   ===================================================================== */
+function stats(t, pos = t.pos) {
+  const off = t.start - 1;
+  const total = t.end - off;
+  const done = clamp(pos - off, 0, total);
+  const remaining = total - done;
+  const daysLeft = diffDays(currentDay, t.deadline) + 1;
+  const restToday = t.rests.includes(currentDay);
+  const pastRests = t.rests.filter(d => d < currentDay).length;
+  const restLeft = Math.max(0, t.restTotal - t.rests.length);
+  const w = daysLeft - Math.max(0, t.restTotal - pastRests);       // planned working days from today on
+  const startPos = t.day && t.day.date === currentDay ? t.day.startPos : t.pos;
+  const startDone = clamp(startPos - off, 0, total);
+  const todayDone = Math.max(0, done - startDone);
+  const finished = remaining === 0;
+  const overdue = !finished && daysLeft < 1;
+
+  // The original plan: a steady rate per working day from the day the task was added
+  const planDays = diffDays(t.created, t.deadline) + 1;
+  const done0 = clamp(t.pos0 - off, 0, total);
+  const r0 = (total - done0) / Math.max(1, planDays - t.restTotal);
+  const atStartOfDay = clamp(total - r0 * w, 0, total);              // where the plan had you this morning
+  const marker = restToday ? atStartOfDay : clamp(total - r0 * (w - 1), 0, total); // ...and tonight
+
+  const target = (finished || overdue || restToday) ? 0 : Math.ceil((total - startDone) / Math.max(1, w));
+  // "From tomorrow" assumes today's target gets done; it only drops when you go beyond it
+  const workingAfterToday = w - (restToday ? 0 : 1);
+  const leftAfterToday = total - Math.min(total, Math.max(done, startDone + target));
+  const nextRate = daysLeft > 1 ? Math.ceil(leftAfterToday / Math.max(1, workingAfterToday)) : null;
+  const noRestRate = daysLeft >= 1 ? Math.ceil((total - startDone) / daysLeft) : null;  // if no more rest days
+
+  let status;
+  if (finished) status = 'done';
+  else if (overdue) status = 'late';
+  else if (done >= marker - 0.01) status = 'ahead';
+  else if (done >= atStartOfDay - 0.01) status = 'ontrack';
+  else status = 'behind';
+
+  return { total, done, remaining, daysLeft, restToday, restLeft, w, todayDone, target, nextRate, noRestRate, marker, status };
+}
+
+const COLOUR = { ahead: 'var(--ahead)', ontrack: 'var(--ontrack)', behind: 'var(--behind)', done: 'var(--ahead)', late: 'var(--late)' };
+const LABEL = { ahead: 'Ahead', ontrack: 'On track', behind: 'Behind' };
+
+/* ---------- Motivational lines: chosen by state, stable for the day ---------- */
+function message(t, s) {
+  const pick = arr => arr[hash(t.id + currentDay) % arr.length];
+  const left = Math.max(0, s.target - s.todayDone);
+
+  if (s.status === 'done') {
+    const early = t.doneOn ? diffDays(t.doneOn, t.deadline) : 0;
+    return early > 0 ? `Finished ${pl(early, 'day')} early. Well done.`
+                     : pick(['Finished. Well done.', 'Done and dusted.', 'Complete. That took steady work.']);
+  }
+  if (s.status === 'late') return `The deadline has passed with ${pl(s.remaining, 'page')} left. Tap ⋯ to pick a new date.`;
+  if (s.restToday) return pick(['Rest day. The plan already allows for it.',
+                                "Recharge today. Your daily target won't change.",
+                                'Rest is part of the plan. See you tomorrow.']);
+  if (left === 0) {
+    const extra = s.todayDone - s.target;
+    if (extra > 0 && s.nextRate != null) return `${pl(extra, 'page')} past today's target. From tomorrow it's ${s.nextRate} a day.`;
+    if (s.daysLeft === 1) return 'Finished for today.';
+    return pick(["Today's target is done. Anything extra makes tomorrow lighter.",
+                 'Done for today. Nice and steady.', "That's today ticked off."]);
+  }
+  if (s.daysLeft === 1) return `Last day: ${pl(left, 'page')} to finish.`;
+  if (s.status === 'behind') {
+    let m = pick(['A bit behind, but very recoverable.', 'Behind the plan for now.', 'Slipped a little; easy to catch up.']);
+    m += ` ${left} today, then about ${s.target} a day, gets you there.`;
+    if (s.restLeft > 0 && s.noRestRate < s.target)
+      m += ` Skip your ${pl(s.restLeft, 'rest day')} and it's ${s.noRestRate} a day.`;
+    return m;
+  }
+  if (s.status === 'ahead') return `You're ahead of the plan. ${pl(left, 'page')} today keeps it that way.`;
+  return pick([`${pl(left, 'page')} to go today.`, `${left} more and today is done.`, `Today: ${pl(left, 'page')}. Small and steady.`]);
+}
+
+/* =====================================================================
+   Rendering
+   ===================================================================== */
+function render() {
+  $('#today-label').textContent = fmt(currentDay, { weekday: 'long', day: 'numeric', month: 'long' });
+  renderTasks();
+  renderChores();
+}
+
+function renderTasks() {
+  const el = $('#tasks');
+  if (!S.tasks.length) {
+    el.innerHTML = `<div class="card empty"><p>Add a book or workbook with a finish date. Steady works out how many pages a day you need, and keeps it updated as you go.</p>
+      <button class="btn primary wide" data-action="add-task">Add your first task</button></div>`;
+    return;
+  }
+  const order = t => (stats(t).status === 'done' ? 1 : 0);
+  const sorted = [...S.tasks].sort((a, b) => order(a) - order(b) || a.deadline.localeCompare(b.deadline));
+  el.innerHTML = sorted.map(taskCard).join('');
+}
+
+function dueLabel(t, s) {
+  const d = fmt(t.deadline);
+  if (s.status === 'done') return t.doneOn ? `Finished ${fmt(t.doneOn)}` : 'Finished';
+  if (s.daysLeft < 1) return `Was due ${d}`;
+  if (s.daysLeft === 1) return 'Due today';
+  if (s.daysLeft === 2) return `Due tomorrow, ${d}`;
+  return `Due ${d} · ${s.daysLeft} days left`;
+}
+
+function ring(s) {
+  const C = 2 * Math.PI * 27;
+  const f = s.target ? Math.min(1, s.todayDone / s.target) : (s.restToday ? 0 : 1);
+  const met = s.target > 0 && s.todayDone >= s.target;
+  const inner = s.restToday ? '<b>Rest</b>' : `<b>${s.todayDone}/${s.target}</b><span>today</span>`;
+  return `<div class="ring ${met ? 'met' : ''}"><svg viewBox="0 0 64 64" width="64" height="64">
+    <circle class="bg" cx="32" cy="32" r="27"/><circle class="fg" cx="32" cy="32" r="27"
+    stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - f)}"/></svg><div class="num">${inner}</div></div>`;
+}
+
+function taskCard(t) {
+  const s = stats(t);
+  const live = s.status !== 'done' && s.status !== 'late';
+  const chip = s.status === 'done' ? 'Finished' : s.status === 'late' ? 'Overdue'
+             : s.restToday ? 'Rest day' : (s.target && s.todayDone >= s.target) ? 'Today done' : LABEL[s.status];
+  const restBtn = `<button class="btn secondary" data-action="rest" data-id="${t.id}" ${!s.restToday && !s.restLeft ? 'disabled' : ''}>
+      ${s.restToday ? 'Undo rest' : s.restLeft ? 'Rest today' : 'No rest days'}</button>`;
+  return `<article class="card" style="--c:${COLOUR[s.status]}">
+    <div class="task-head">
+      <div><h3 class="task-name">${t.kind === 'workbook' ? '📝' : '📖'} ${esc(t.name)}</h3><div class="due">${dueLabel(t, s)}</div></div>
+      <div class="head-right"><span class="chip">${chip}</span>
+        <button class="icon-btn sm" data-action="edit-task" data-id="${t.id}" aria-label="Edit task">⋯</button></div>
+    </div>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${s.total}" aria-valuenow="${s.done}">
+      <div class="fill" style="width:${s.done / s.total * 100}%"></div>
+      ${live ? `<div class="mark" style="left:${s.marker / s.total * 100}%"></div>` : ''}
+    </div>
+    <div class="bar-label"><span>${s.done} of ${s.total} pages</span><span>${Math.floor(s.done / s.total * 100)}%</span></div>
+    ${live ? `<div class="stats">${ring(s)}
+      <div class="stat"><div class="k">From tomorrow</div><div class="v">${s.nextRate == null ? 'Last day' : s.nextRate === 0 ? 'All done' : `${s.nextRate} a day`}</div></div>
+      <div class="stat"><div class="k">Rest days</div><div class="v">${s.restLeft} left</div></div></div>` : ''}
+    <p class="msg">${esc(message(t, s))}</p>
+    <div class="actions">${live ? `<button class="btn primary" data-action="log" data-id="${t.id}">Log progress</button>${restBtn}`
+      : s.status === 'late' ? `<button class="btn primary" data-action="log" data-id="${t.id}">Log progress</button>` : ''}</div>
+  </article>`;
+}
+
+function renderChores() {
+  const el = $('#chores');
+  if (!S.chores.length) {
+    el.innerHTML = `<div class="card empty"><p>Add weekly chores, like making your bed or taking out the bins. They reset every Monday.</p>
+      <button class="btn primary wide" data-action="add-chore">Add a chore</button></div>`;
+    return;
+  }
+  const wk = weekStart(currentDay);
+  const log = S.choreLog[wk] || {};
+  const total = S.chores.reduce((a, c) => a + c.perWeek, 0);
+  const done = S.chores.reduce((a, c) => a + Math.min(log[c.id] || 0, c.perWeek), 0);
+  const all = done >= total;
+  const daysLeft = 7 - diffDays(wk, currentDay);
+  const rows = S.chores.map(c => {
+    const n = Math.min(log[c.id] || 0, c.perWeek);
+    const pips = Array.from({ length: c.perWeek }, (_, i) => `<i class="pip ${i < n ? 'on' : ''}"></i>`).join('');
+    return `<li class="${n >= c.perWeek ? 'complete' : ''}">
+      <button class="chore-name" data-action="edit-chore" data-id="${c.id}">${esc(c.name)}</button>
+      <span class="pips" aria-label="${n} of ${c.perWeek}">${pips}</span>
+      <button class="round" data-action="chore-minus" data-id="${c.id}" ${n ? '' : 'disabled'} aria-label="Undo">−</button>
+      <button class="round plus" data-action="chore-plus" data-id="${c.id}" ${n >= c.perWeek ? 'disabled' : ''} aria-label="Done once">+</button>
+    </li>`;
+  }).join('');
+  el.innerHTML = `<div class="card" style="--c:${all ? 'var(--ahead)' : 'var(--ontrack)'}">
+    <div class="bar" style="margin-top:4px"><div class="fill" style="width:${total ? done / total * 100 : 0}%"></div></div>
+    <div class="bar-label"><span>${done} of ${total} done</span><span>${fmt(wk, { day: 'numeric', month: 'short' })} to ${fmt(addDays(wk, 6), { day: 'numeric', month: 'short' })}</span></div>
+    <ul class="chores">${rows}</ul>
+    <p class="msg">${all ? 'Every chore done this week. 🎉' : `${pl(total - done, 'chore')} to go, ${pl(daysLeft, 'day')} left this week.`}</p>
+  </div>`;
+}
+
+/* =====================================================================
+   Sheets (forms)
+   ===================================================================== */
+let onSheetClose = null;
+function openSheet(html, onMount, onClose) {
+  const root = $('#sheet-root');
+  root.innerHTML = `<div class="overlay"></div><div class="sheet" role="dialog" aria-modal="true">${html}</div>`;
+  root.classList.add('open');
+  onSheetClose = onClose || null;
+  root.querySelector('.overlay').onclick = closeSheet;
+  root.querySelectorAll('[data-close]').forEach(b => b.onclick = closeSheet);
+  if (onMount) onMount(root.querySelector('.sheet'));
+}
+function closeSheet() {
+  const root = $('#sheet-root');
+  root.classList.remove('open');
+  root.innerHTML = '';
+  const cb = onSheetClose; onSheetClose = null;
+  if (cb) cb();
+}
+const head = (title, saveLabel = 'Save') =>
+  `<div class="sheet-head"><button class="link-btn" data-close>Cancel</button><h3>${title}</h3>
+   <button class="link-btn" id="save">${saveLabel}</button></div>`;
+
+/* ---------- Add / edit a task ---------- */
+function taskForm(t) {
+  const isNew = !t;
+  const v = t || { name: '', kind: 'book', start: 1, end: '', deadline: addDays(currentDay, 27), restTotal: 4 };
+  const already = t && t.pos >= t.start ? t.pos : '';
+  openSheet(`${head(isNew ? 'New task' : 'Edit task')}
+    <div class="form">
+      <label>Name<input id="f-name" type="text" value="${esc(v.name)}" placeholder="e.g. The Hobbit" autocomplete="off"></label>
+      <div class="seg">
+        <label><input type="radio" name="kind" value="book" ${v.kind !== 'workbook' ? 'checked' : ''}><span>📖 Book</span></label>
+        <label><input type="radio" name="kind" value="workbook" ${v.kind === 'workbook' ? 'checked' : ''}><span>📝 Workbook</span></label>
+      </div>
+      <div class="two">
+        <label>First page<input id="f-start" type="number" inputmode="numeric" value="${v.start}"></label>
+        <label>Last page<input id="f-end" type="number" inputmode="numeric" value="${v.end}"></label>
+      </div>
+      <label>Already finished up to page <span class="opt">optional</span>
+        <input id="f-pos" type="number" inputmode="numeric" value="${already}" placeholder="Not started"></label>
+      <label>Finish by<input id="f-deadline" type="date" min="${currentDay}" value="${v.deadline}"></label>
+      <label>Rest days <span class="opt" id="f-hint"></span>
+        <input id="f-rest" type="number" inputmode="numeric" min="0" value="${v.restTotal}"></label>
+      <p class="preview" id="f-preview"></p>
+      <p class="error" id="f-error"></p>
+      ${isNew ? '' : '<button class="btn danger" id="f-delete">Delete task</button>'}
+    </div>`, sheet => {
+    const f = id => sheet.querySelector(id);
+    let restTouched = !isNew;
+    const pastRests = t ? t.rests.filter(d => d < currentDay).length : 0;
+
+    // Read and validate the form. Returns the values, or a string describing the problem.
+    const read = () => {
+      const name = f('#f-name').value.trim();
+      const kind = sheet.querySelector('input[name=kind]:checked').value;
+      const start = toInt(f('#f-start').value), end = toInt(f('#f-end').value);
+      const posIn = toInt(f('#f-pos').value), deadline = f('#f-deadline').value;
+      const rest = toInt(f('#f-rest').value) ?? 0;
+      if (start == null || end == null) return 'Enter the first and last page.';
+      if (end < start) return 'The last page must come after the first page.';
+      const pos = posIn == null ? start - 1 : posIn;
+      if (pos < start - 1 || pos > end) return `"Already finished" must be between page ${start} and page ${end}.`;
+      if (!deadline) return 'Pick a finish date.';
+      const days = diffDays(currentDay, deadline) + 1;
+      if (days < 1 && pos < end) return 'Pick a finish date from today onwards.';
+      if (rest < 0) return 'Rest days cannot be negative.';
+      if (t && rest < t.rests.length) return `You've already used ${pl(t.rests.length, 'rest day')}.`;
+      if (pos < end && rest - pastRests > days - 1) return 'That is more rest days than the time allows.';
+      return { name, kind, start, end, pos, deadline, rest, days };
+    };
+
+    const update = () => {
+      const deadline = f('#f-deadline').value;
+      if (deadline) {
+        const days = diffDays(currentDay, deadline) + 1;
+        const suggest = Math.floor(days / 7);
+        f('#f-hint').textContent = `suggested ${suggest} (1 per week)`;
+        if (!restTouched) f('#f-rest').value = suggest;
+      }
+      const r = read();
+      f('#f-error').textContent = '';
+      if (typeof r === 'string') { f('#f-preview').textContent = ''; return; }
+      const pages = r.end - r.pos, working = r.days - (r.rest - pastRests);
+      f('#f-preview').textContent = pages === 0 ? 'Already finished.'
+        : `${pl(pages, 'page')} over ${pl(working, 'working day')}: about ${Math.ceil(pages / working)} a day.`;
+    };
+    f('#f-rest').addEventListener('input', () => { restTouched = true; });
+    sheet.querySelectorAll('input').forEach(i => i.addEventListener('input', update));
+    update();
+
+    f('#save').onclick = () => {
+      const r = read();
+      if (typeof r === 'string') { f('#f-error').textContent = r; return; }
+      if (!r.name) { f('#f-error').textContent = 'Give it a name.'; return; }
+      if (isNew) {
+        S.tasks.push({ id: uid(), name: r.name, kind: r.kind, start: r.start, end: r.end, pos: r.pos, pos0: r.pos,
+          deadline: r.deadline, restTotal: r.rest, rests: [], created: currentDay,
+          day: { date: currentDay, startPos: r.pos }, history: {}, doneOn: r.pos >= r.end ? currentDay : null });
+      } else {
+        Object.assign(t, { name: r.name, kind: r.kind, start: r.start, end: r.end, deadline: r.deadline, restTotal: r.rest });
+        t.pos0 = clamp(t.pos0, r.start - 1, r.end);
+        if (r.pos !== t.pos) setPos(t, r.pos, true);
+      }
+      save(); closeSheet(); render();
+    };
+    if (!isNew) f('#f-delete').onclick = () => {
+      if (!confirm(`Delete "${t.name}"? This can't be undone.`)) return;
+      S.tasks = S.tasks.filter(x => x !== t);
+      save(); closeSheet(); render();
+    };
+  });
+}
+
+/* ---------- Log progress ---------- */
+function logSheet(t) {
+  const shown = t.pos >= t.start ? t.pos : '';
+  openSheet(`${head('Log progress')}
+    <div class="form">
+      <p class="muted">${t.kind === 'workbook' ? '📝' : '📖'} ${esc(t.name)}, pages ${t.start} to ${t.end}</p>
+      <label>Finished up to page<input id="l-pos" class="big" type="number" inputmode="numeric" value="${shown}" placeholder="${t.start - 1}"></label>
+      <div class="quick"><button data-add="1">+1</button><button data-add="5">+5</button><button data-add="10">+10</button><button data-add="20">+20</button></div>
+      <p class="preview" id="l-preview"></p>
+      <p class="error" id="l-error"></p>
+      <button class="btn primary wide" id="l-save">Save</button>
+    </div>`, sheet => {
+    const input = sheet.querySelector('#l-pos');
+    const value = () => toInt(input.value) ?? (t.start - 1);
+    const update = () => {
+      const p = value();
+      sheet.querySelector('#l-error').textContent = '';
+      if (p < t.start - 1 || p > t.end) { sheet.querySelector('#l-preview').textContent = `Enter a page from ${t.start} to ${t.end}.`; return; }
+      const s = stats(t, p);
+      sheet.querySelector('#l-preview').textContent = s.remaining === 0 ? 'That finishes it! 🎉'
+        : `Today: ${pl(s.todayDone, 'page')}${s.target ? ` of ${s.target}` : ''}. ` +
+          (s.nextRate == null ? `${pl(s.remaining, 'page')} left.` : `From tomorrow: ${s.nextRate} a day.`);
+    };
+    sheet.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
+      input.value = clamp(value() + +b.dataset.add, t.start - 1, t.end); update();
+    });
+    input.addEventListener('input', update);
+    update();
+    const commit = () => {
+      const p = value();
+      if (p < t.start - 1 || p > t.end) { sheet.querySelector('#l-error').textContent = `Enter a page from ${t.start} to ${t.end}.`; return; }
+      closeSheet();
+      setPos(t, p);
+    };
+    sheet.querySelector('#save').onclick = commit;
+    sheet.querySelector('#l-save').onclick = commit;
+  });
+}
+
+/* Update a task's position, then celebrate anything worth celebrating */
+function setPos(t, p, quiet) {
+  const before = stats(t);
+  t.pos = p;
+  if (t.day && t.day.date === currentDay) t.day.startPos = Math.min(t.day.startPos, p);
+  t.history[currentDay] = p;
+  t.doneOn = p >= t.end ? (t.doneOn || currentDay) : null;
+  save(); render();
+  if (quiet) return;
+  const after = stats(t);
+  const pctB = before.done / before.total * 100, pctA = after.done / after.total * 100;
+  if (after.status === 'done' && before.status !== 'done') { toast(`You finished ${t.name}! 🎉`); confetti(); return; }
+  const mile = [75, 50, 25].find(m => pctB < m && pctA >= m);
+  if (mile) { toast(mile === 50 ? `Halfway through ${t.name}!` : `${mile}% of ${t.name} done!`); confetti(); return; }
+  if (after.target && before.todayDone < before.target && after.todayDone >= after.target) { toast("Today's target done ✓"); confetti(); return; }
+  toast(after.nextRate != null && after.nextRate < before.nextRate ? `Saved. Tomorrow is now ${after.nextRate} a day.` : 'Saved.');
+}
+
+/* ---------- Rest days ---------- */
+function toggleRest(t) {
+  const i = t.rests.indexOf(currentDay);
+  if (i >= 0) { t.rests.splice(i, 1); toast('Rest day undone.'); }
+  else if (t.rests.length < t.restTotal) { t.rests.push(currentDay); toast('Rest day taken. Your rate stays the same.'); }
+  save(); render();
+}
+const canRest = (t, d) => t.pos < t.end && d >= t.created && d <= t.deadline && !t.rests.includes(d) && t.rests.length < t.restTotal;
+
+// Days since the app was last opened, oldest first, at most the last 14
+function missedDays() {
+  if (!S.lastOpen) return [];
+  const out = [];
+  const yesterday = addDays(currentDay, -1);
+  let d = addDays(S.lastOpen, 1);
+  if (diffDays(d, yesterday) > 13) d = addDays(yesterday, -13);
+  for (; d <= yesterday; d = addDays(d, 1)) if (S.tasks.some(t => canRest(t, d))) out.push(d);
+  return out;
+}
+function askMissed(days) {
+  const finish = () => { S.lastOpen = currentDay; save(); render(); };
+  openSheet(`<div class="sheet-head"><span></span><h3>Missed days</h3><button class="link-btn" id="save">Done</button></div>
+    <div class="form">
+      <p>You didn't open Steady on ${days.length === 1 ? 'this day' : 'these days'}. Tick any that were rest days: sick, too much homework, tough training, anything.</p>
+      ${days.map(d => `<label class="check-row"><input type="checkbox" value="${d}"><span>${fmt(d, { weekday: 'long', day: 'numeric', month: 'long' })}</span></label>`).join('')}
+      <p class="muted small">Ticked days come out of your rest-day budget, so your daily target stays the same. Unticked days count as missed.</p>
+      <button class="btn primary wide" id="m-done">Done</button>
+    </div>`, sheet => {
+    const done = () => {
+      sheet.querySelectorAll('input:checked').forEach(cb =>
+        S.tasks.forEach(t => { if (canRest(t, cb.value)) { t.rests.push(cb.value); t.rests.sort(); } }));
+      closeSheet();
+    };
+    sheet.querySelector('#save').onclick = done;
+    sheet.querySelector('#m-done').onclick = done;
+  }, finish);
+}
+
+/* ---------- Chores ---------- */
+function choreForm(c) {
+  const isNew = !c;
+  openSheet(`${head(isNew ? 'New chore' : 'Edit chore')}
+    <div class="form">
+      <label>Chore<input id="c-name" type="text" value="${esc(c ? c.name : '')}" placeholder="e.g. Take out the bins" autocomplete="off"></label>
+      <label>Times per week<input id="c-n" type="number" inputmode="numeric" min="1" max="7" value="${c ? c.perWeek : 1}"></label>
+      <p class="error" id="c-error"></p>
+      ${isNew ? '' : '<button class="btn danger" id="c-delete">Delete chore</button>'}
+    </div>`, sheet => {
+    sheet.querySelector('#save').onclick = () => {
+      const name = sheet.querySelector('#c-name').value.trim();
+      const n = toInt(sheet.querySelector('#c-n').value);
+      if (!name) { sheet.querySelector('#c-error').textContent = 'Give the chore a name.'; return; }
+      if (n == null || n < 1 || n > 7) { sheet.querySelector('#c-error').textContent = 'Times per week must be from 1 to 7.'; return; }
+      if (isNew) S.chores.push({ id: uid(), name, perWeek: n }); else Object.assign(c, { name, perWeek: n });
+      save(); closeSheet(); render();
+    };
+    if (!isNew) sheet.querySelector('#c-delete').onclick = () => {
+      if (!confirm(`Delete "${c.name}"?`)) return;
+      S.chores = S.chores.filter(x => x !== c);
+      save(); closeSheet(); render();
+    };
+  });
+}
+const choresComplete = () => {
+  const log = S.choreLog[weekStart(currentDay)] || {};
+  return S.chores.length > 0 && S.chores.every(c => (log[c.id] || 0) >= c.perWeek);
+};
+function bumpChore(id, d) {
+  const c = S.chores.find(x => x.id === id);
+  const wk = weekStart(currentDay);
+  const log = S.choreLog[wk] = S.choreLog[wk] || {};
+  const before = choresComplete();
+  log[id] = clamp((log[id] || 0) + d, 0, c.perWeek);
+  save(); render();
+  if (!before && choresComplete()) { toast('Every chore done this week! 🎉'); confetti(); }
+}
+
+/* ---------- Settings: how it works, backup and restore ---------- */
+const toCode = s => { const b = new TextEncoder().encode(JSON.stringify(s)); let bin = ''; b.forEach(x => bin += String.fromCharCode(x)); return 'STEADY1:' + btoa(bin); };
+const fromCode = code => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(code.trim().replace(/^STEADY1:/, '')), c => c.charCodeAt(0))));
+
+function settingsSheet() {
+  openSheet(`<div class="sheet-head"><span></span><h3>Steady</h3><button class="link-btn" data-close>Close</button></div>
+    <div class="form help">
+      <h4>How it works</h4>
+      <p>Each morning Steady sets <b>today's target</b>: the pages left, shared across the working days before your deadline. The target stays fixed all day.</p>
+      <p>Do more than the target and <b>tomorrow's number drops</b>.</p>
+      <p>The thin line on each bar shows where the plan says you should be by tonight.
+        <span class="legend" style="background:var(--ahead)"></span>ahead,
+        <span class="legend" style="background:var(--ontrack)"></span>on track,
+        <span class="legend" style="background:var(--behind)"></span>behind.</p>
+      <p><b>Rest days</b> are built into the plan, so taking one doesn't raise your target. If you miss days without opening the app, Steady asks whether they were rest days.</p>
+      <p>Chores reset every Monday.</p>
+
+      <h4>Backup</h4>
+      <p>Your data lives only on this phone. Removing Steady from the home screen deletes it, so copy a backup code now and then and keep it somewhere safe, such as Notes.</p>
+      <button class="btn primary wide" id="b-copy">Copy backup code</button>
+      <textarea id="b-out" readonly style="display:none"></textarea>
+
+      <h4>Restore</h4>
+      <p>Paste a backup code to replace everything on this phone.</p>
+      <textarea id="b-in" placeholder="STEADY1:…"></textarea>
+      <p class="error" id="b-error"></p>
+      <button class="btn secondary wide" id="b-restore">Restore from code</button>
+    </div>`, sheet => {
+    sheet.querySelector('#b-copy').onclick = async () => {
+      const code = toCode(S);
+      try { await navigator.clipboard.writeText(code); toast('Backup code copied. Paste it into Notes.'); }
+      catch {
+        const out = sheet.querySelector('#b-out');
+        out.style.display = 'block'; out.value = code; out.focus(); out.select();
+        toast('Select the code and copy it.');
+      }
+    };
+    sheet.querySelector('#b-restore').onclick = () => {
+      let data;
+      try { data = fromCode(sheet.querySelector('#b-in').value); } catch { data = null; }
+      if (!data || data.version !== 1 || !Array.isArray(data.tasks)) {
+        sheet.querySelector('#b-error').textContent = "That doesn't look like a Steady backup code."; return;
+      }
+      if (!confirm('Replace everything on this phone with this backup?')) return;
+      S = { ...blank(), ...data };
+      save(); closeSheet(); rollover(); toast('Backup restored.');
+    };
+  });
+}
+
+/* ---------- Feedback ---------- */
+let toastTimer;
+function toast(text) {
+  const el = $('#toast');
+  el.textContent = text; el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+function confetti() {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const box = document.createElement('div'); box.className = 'confetti';
+  const cols = ['var(--gold)', 'var(--ahead)', 'var(--ontrack)', 'var(--behind)'];
+  for (let i = 0; i < 40; i++) {
+    const p = document.createElement('i');
+    p.style.left = Math.random() * 100 + '%';
+    p.style.background = cols[i % cols.length];
+    p.style.animationDelay = Math.random() * .3 + 's';
+    p.style.setProperty('--x', (Math.random() * 80 - 40) + 'px');
+    p.style.setProperty('--r', Math.random() * 720 + 'deg');
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 2400);
+}
+
+/* =====================================================================
+   Start of day: fix each task's starting point, then ask about missed days.
+   Runs on launch, and again if the app is resumed on a new day
+   (iOS keeps home screen apps in memory, so a reload isn't guaranteed).
+   ===================================================================== */
+function rollover() {
+  currentDay = todayStr();
+  S.tasks.forEach(t => { if (!t.day || t.day.date !== currentDay) t.day = { date: currentDay, startPos: t.pos }; });
+  const missed = missedDays();
+  if (missed.length) { save(); render(); askMissed(missed); }
+  else { S.lastOpen = currentDay; save(); render(); }
+}
+const checkDay = () => { if (todayStr() !== currentDay) { closeSheet(); rollover(); } };
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
+setInterval(checkDay, 60000);
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-action]');
+  if (!b || b.disabled) return;
+  const id = b.dataset.id;
+  const t = id && S.tasks.find(x => x.id === id);
+  switch (b.dataset.action) {
+    case 'add-task': return taskForm();
+    case 'edit-task': return taskForm(t);
+    case 'log': return logSheet(t);
+    case 'rest': return toggleRest(t);
+    case 'add-chore': return choreForm();
+    case 'edit-chore': return choreForm(S.chores.find(c => c.id === id));
+    case 'chore-plus': return bumpChore(id, 1);
+    case 'chore-minus': return bumpChore(id, -1);
+    case 'settings': return settingsSheet();
+  }
+});
+
+rollover();
+
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
+if ('serviceWorker' in navigator) {
+  const hadController = !!navigator.serviceWorker.controller;   // no reload on the very first install
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) location.reload(); });
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
