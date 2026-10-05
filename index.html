@@ -166,6 +166,29 @@ h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacin
 .help h4 { margin: 24px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
 .legend { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; margin-right: 4px; }
 
+/* ---------- History ---------- */
+.hist-link { background: none; border: 0; color: var(--link); font-size: 13px; font-weight: 600; padding: 8px 0 8px 4px; margin: -8px 0; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.tile .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.tile .v { font-size: 22px; font-weight: 600; }
+.tile .sub { font-size: 12px; color: var(--muted); }
+.hlegend { display: flex; gap: 16px; margin: 20px 0 6px; font-size: 12px; color: var(--muted); }
+.hlegend span { display: flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; width: 12px; height: 8px; border-radius: 0 3px 3px 0; }
+.sw.gold { background: var(--gold); }
+.sw.tick { width: 2px; height: 12px; border-radius: 1px; background: var(--marker); opacity: .55; }
+.hrow { display: grid; grid-template-columns: 96px 1fr 44px; align-items: center; gap: 10px; padding: 7px 0;
+  border-bottom: 1px solid var(--line); font-size: 14px; }
+.hdate { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.htrack { position: relative; height: 10px; }
+.hbar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ontrack); border-radius: 0 4px 4px 0; }
+.hrow.met .hbar { background: var(--gold); }
+.htick { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--marker); opacity: .55; }
+.hnum { text-align: right; font-weight: 600; }
+.hrow.missed .hnum { color: var(--muted); font-weight: 400; }
+.hrow.rest .hnote { grid-column: 2 / 4; color: var(--muted); font-size: 13px; font-style: italic; }
+
 /* ---------- Feedback ---------- */
 .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translate(-50%, 20px);
   opacity: 0; background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 999px; font-weight: 600;
@@ -371,6 +394,16 @@ function renderTasks() {
       <button class="btn primary wide" data-action="add-task">Add your first task</button></div>`;
     return;
   }
+  // Remember each day's target, for the history view (past targets can't be rebuilt later)
+  let dirty = false;
+  S.tasks.forEach(t => {
+    const s = stats(t);
+    if (s.status === 'done' || s.status === 'late') return;
+    t.targets = t.targets || {};
+    if (t.targets[currentDay] !== s.target) { t.targets[currentDay] = s.target; dirty = true; }
+  });
+  if (dirty) save();
+
   const order = t => (stats(t).status === 'done' ? 1 : 0);
   const sorted = [...S.tasks].sort((a, b) => order(a) - order(b) || a.deadline.localeCompare(b.deadline));
   el.innerHTML = sorted.map(taskCard).join('');
@@ -413,7 +446,8 @@ function taskCard(t) {
       ${live ? `<div class="mark" style="left:${s.ghost / s.total * 100}%"></div>
         <span class="ghost" style="left:${s.ghost / s.total * 100}%" aria-hidden="true">👻</span>` : ''}
     </div>
-    <div class="bar-label"><span>${s.done} of ${s.total} pages</span><span>${Math.floor(s.done / s.total * 100)}%</span></div>
+    <div class="bar-label"><span>${s.done} of ${s.total} pages</span>
+      <span>${Math.floor(s.done / s.total * 100)}% · <button class="hist-link" data-action="history" data-id="${t.id}">History ›</button></span></div>
     ${live ? `<div class="lead">${leadText(s)}</div>` : ''}
     ${live ? `<div class="stats">${ring(s)}
       <div class="stat"><div class="k">From tomorrow</div><div class="v">${s.nextRate == null ? 'Last day' : s.nextRate === 0 ? 'All done' : `${s.nextRate} a day`}</div></div>
@@ -635,6 +669,56 @@ function setPos(t, p, quiet) {
   toast(after.nextRate != null && after.nextRate < before.nextRate ? `Saved. Tomorrow is now ${after.nextRate} a day.` : 'Saved.');
 }
 
+/* ---------- Reading history ----------
+   Pages read on a day = end-of-day position minus the previous day's.
+   Days with no log keep the previous position, so they count as 0. */
+function dailyLog(t) {
+  const rows = [];
+  const last = t.doneOn && t.doneOn < currentDay ? t.doneOn : currentDay;
+  let prev = t.pos0;
+  for (let d = t.created; d <= last; d = addDays(d, 1)) {
+    const end = d === currentDay ? t.pos : (t.history[d] ?? prev);
+    const read = Math.max(0, end - prev);
+    prev = end;
+    const target = t.targets ? t.targets[d] : undefined;
+    rows.push({ date: d, read, target, rest: t.rests.includes(d), today: d === currentDay,
+                met: target > 0 && read >= target });
+  }
+  return rows.reverse();                                  // newest first
+}
+
+function historySheet(t) {
+  const rows = dailyLog(t);
+  const total = rows.reduce((a, r) => a + r.read, 0);
+  const best = rows.reduce((b, r) => (r.read > (b ? b.read : 0) ? r : b), null);
+  const metDays = rows.filter(r => r.met).length;
+  const scale = Math.max(1, ...rows.map(r => Math.max(r.read, r.target || 0)));
+  const pct = x => (x / scale * 100).toFixed(1) + '%';
+
+  const rowHtml = r => {
+    const label = r.today ? 'Today' : fmt(r.date);
+    if (r.rest && !r.read) return `<div class="hrow rest"><span class="hdate">${label}</span><span class="hnote">Rest day</span></div>`;
+    return `<div class="hrow ${r.met ? 'met' : ''} ${!r.read && !r.today ? 'missed' : ''}">
+      <span class="hdate">${label}</span>
+      <span class="htrack">${r.read ? `<i class="hbar" style="width:${pct(r.read)}"></i>` : ''}
+        ${r.target > 0 ? `<i class="htick" style="left:${pct(r.target)}"></i>` : ''}</span>
+      <span class="hnum">${r.read}${r.met ? ' ✓' : ''}</span></div>`;
+  };
+
+  openSheet(`<div class="sheet-head"><span></span><h3>History</h3><button class="link-btn" data-close>Close</button></div>
+    <div class="form">
+      <p class="muted">${t.kind === 'workbook' ? '📝' : '📖'} ${esc(t.name)}, since ${fmt(t.created)}</p>
+      <div class="tiles">
+        <div class="tile"><div class="k">Pages read</div><div class="v">${total}</div></div>
+        <div class="tile"><div class="k">Best day</div><div class="v">${best ? best.read : 0}</div>
+          <div class="sub">${best ? fmt(best.date) : 'Not yet'}</div></div>
+        <div class="tile"><div class="k">Target met</div><div class="v">${metDays}</div><div class="sub">${metDays === 1 ? 'day' : 'days'}</div></div>
+      </div>
+      <div class="hlegend"><span><i class="sw gold"></i>Target met</span><span><i class="sw tick"></i>That day's target</span></div>
+      <div class="hlist">${rows.map(rowHtml).join('')}</div>
+    </div>`);
+}
+
 /* ---------- Rest days ---------- */
 function toggleRest(t) {
   const i = t.rests.indexOf(currentDay);
@@ -812,6 +896,7 @@ document.addEventListener('click', e => {
     case 'add-task': return taskForm();
     case 'edit-task': return taskForm(t);
     case 'log': return logSheet(t);
+    case 'history': return historySheet(t);
     case 'rest': return toggleRest(t);
     case 'add-chore': return choreForm();
     case 'edit-chore': return choreForm(S.chores.find(c => c.id === id));
