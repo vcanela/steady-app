@@ -76,7 +76,10 @@ h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacin
 .bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: var(--c);
   transition: width .6s ease, background-color .4s; }
 .bar .mark { position: absolute; top: -5px; bottom: -5px; width: 3px; margin-left: -1.5px;
-  border-radius: 2px; background: var(--marker); opacity: .55; }
+  border-radius: 2px; background: var(--marker); opacity: .55; transition: left .6s ease; }
+.bar.chase { margin-top: 30px; }
+.bar .ghost { position: absolute; top: -27px; transform: translateX(-50%); font-size: 17px; line-height: 1; transition: left .6s ease; }
+.lead { margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--c); }
 .bar-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
 
 .stats { display: grid; grid-template-columns: 64px 1fr 1fr; gap: 12px; align-items: center; margin-top: 14px; }
@@ -265,12 +268,15 @@ function stats(t, pos = t.pos) {
   const finished = remaining === 0;
   const overdue = !finished && daysLeft < 1;
 
-  // The original plan: a steady rate per working day from the day the task was added
+  // The ghost: where the original plan (a steady r0 pages per working day) had you this morning.
+  // It jumps forward by r0 each morning, except after a rest day.
   const planDays = diffDays(t.created, t.deadline) + 1;
   const done0 = clamp(t.pos0 - off, 0, total);
   const r0 = (total - done0) / Math.max(1, planDays - t.restTotal);
-  const atStartOfDay = clamp(total - r0 * w, 0, total);              // where the plan had you this morning
-  const marker = restToday ? atStartOfDay : clamp(total - r0 * (w - 1), 0, total); // ...and tonight
+  const ghost = clamp(total - r0 * w, 0, total);
+  const step = restToday ? 0 : r0;            // how far the ghost moves tonight
+  const lead = done - ghost;                  // pages ahead of the ghost right now
+  const banked = lead - step;                 // ...and once it has moved tonight
 
   const target = (finished || overdue || restToday) ? 0 : Math.ceil((total - startDone) / Math.max(1, w));
   // "From tomorrow" assumes today's target gets done; it only drops when you go beyond it
@@ -282,15 +288,24 @@ function stats(t, pos = t.pos) {
   let status;
   if (finished) status = 'done';
   else if (overdue) status = 'late';
-  else if (done >= marker - 0.01) status = 'ahead';
-  else if (done >= atStartOfDay - 0.01) status = 'ontrack';
-  else status = 'behind';
+  else if (lead <= -1) status = 'behind';     // the ghost has caught you
+  else if (lead < 1) status = 'ontrack';      // level with it
+  else status = 'ahead';
 
-  return { total, done, remaining, daysLeft, restToday, restLeft, w, todayDone, target, nextRate, noRestRate, marker, status };
+  return { total, done, remaining, daysLeft, restToday, restLeft, w, todayDone, target, nextRate, noRestRate,
+           ghost, r0, lead, banked, status };
 }
 
 const COLOUR = { ahead: 'var(--ahead)', ontrack: 'var(--ontrack)', behind: 'var(--behind)', done: 'var(--ahead)', late: 'var(--late)' };
-const LABEL = { ahead: 'Ahead', ontrack: 'On track', behind: 'Behind' };
+const LABEL = { ahead: 'Ahead', ontrack: 'Level', behind: 'Caught' };
+const fmtDays = d => d === 0.5 ? 'half a day' : d === 1 ? '1 day' : `${d} days`;
+
+function leadText(s) {
+  if (s.lead <= -1) return `The ghost has caught you: ${pl(Math.ceil(-s.lead), 'page')} behind`;
+  if (s.lead < 1) return 'Level with the ghost';
+  const days = Math.floor(s.lead / s.r0 * 2) / 2;
+  return days < 1 ? `${pl(Math.floor(s.lead), 'page')} ahead of the ghost` : `${fmtDays(days)} ahead of the ghost`;
+}
 
 /* ---------- Motivational lines: chosen by state, stable for the day ---------- */
 function message(t, s) {
@@ -307,22 +322,37 @@ function message(t, s) {
                                 "Recharge today. Your daily target won't change.",
                                 'Rest is part of the plan. See you tomorrow.']);
   if (left === 0) {
+    if (s.daysLeft === 1) return 'Finished for today.';
+    // Nudges to go beyond the target, kept reasonable: only once the target is met,
+    // never more than 1.5x the target in a day, and none once 3 days ahead.
+    const maxToday = s.target + Math.ceil(s.target / 2);
+    const fits = n => n > 0 && s.todayDone + n <= maxToday;
+    if (s.banked >= 3 * s.r0) return 'Big lead. No need to push; enjoy it.';
+    const morningLead = s.lead - s.todayDone;
+    if (morningLead >= 1 && s.banked < morningLead) {        // ahead, with a lowered target
+      const x = Math.ceil(morningLead - s.banked);
+      if (fits(x)) return `Today's ${s.target} done. ${x} more holds your lead.`;
+    }
+    if (s.banked > -1) {                                      // offer the next half day of lead
+      const k = Math.floor(Math.max(0, s.banked) / (s.r0 / 2)) + 1;
+      const n = Math.ceil(k * s.r0 / 2 - s.banked);
+      if (fits(n)) return `${n} more and you start tomorrow ${fmtDays(k / 2)} ahead of the ghost.`;
+    }
     const extra = s.todayDone - s.target;
     if (extra > 0 && s.nextRate != null) return `${pl(extra, 'page')} past today's target. From tomorrow it's ${s.nextRate} a day.`;
-    if (s.daysLeft === 1) return 'Finished for today.';
     return pick(["Today's target is done. Anything extra makes tomorrow lighter.",
                  'Done for today. Nice and steady.', "That's today ticked off."]);
   }
   if (s.daysLeft === 1) return `Last day: ${pl(left, 'page')} to finish.`;
   if (s.status === 'behind') {
-    let m = pick(['A bit behind, but very recoverable.', 'Behind the plan for now.', 'Slipped a little; easy to catch up.']);
-    m += ` ${left} today, then about ${s.target} a day, gets you there.`;
+    let m = pick(["The ghost has caught up, but it's very recoverable.", 'The ghost is ahead for now.', 'Slipped behind the ghost; easy to catch up.']);
+    m += ` ${left} today, then about ${s.target} a day, gets you clear.`;
     if (s.restLeft > 0 && s.noRestRate < s.target)
       m += ` Skip your ${pl(s.restLeft, 'rest day')} and it's ${s.noRestRate} a day.`;
     return m;
   }
-  if (s.status === 'ahead') return `You're ahead of the plan. ${pl(left, 'page')} today keeps it that way.`;
-  return pick([`${pl(left, 'page')} to go today.`, `${left} more and today is done.`, `Today: ${pl(left, 'page')}. Small and steady.`]);
+  if (s.status === 'ahead') return `You're ahead of the ghost. ${pl(left, 'page')} to go today.`;
+  return pick([`${pl(left, 'page')} to go today.`, `${left} more and today is done.`, `Level with the ghost. ${left} today pulls you clear.`]);
 }
 
 /* =====================================================================
@@ -378,11 +408,13 @@ function taskCard(t) {
       <div class="head-right"><span class="chip">${chip}</span>
         <button class="icon-btn sm" data-action="edit-task" data-id="${t.id}" aria-label="Edit task">⋯</button></div>
     </div>
-    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${s.total}" aria-valuenow="${s.done}">
+    <div class="bar ${live ? 'chase' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="${s.total}" aria-valuenow="${s.done}">
       <div class="fill" style="width:${s.done / s.total * 100}%"></div>
-      ${live ? `<div class="mark" style="left:${s.marker / s.total * 100}%"></div>` : ''}
+      ${live ? `<div class="mark" style="left:${s.ghost / s.total * 100}%"></div>
+        <span class="ghost" style="left:${s.ghost / s.total * 100}%" aria-hidden="true">👻</span>` : ''}
     </div>
     <div class="bar-label"><span>${s.done} of ${s.total} pages</span><span>${Math.floor(s.done / s.total * 100)}%</span></div>
+    ${live ? `<div class="lead">${leadText(s)}</div>` : ''}
     ${live ? `<div class="stats">${ring(s)}
       <div class="stat"><div class="k">From tomorrow</div><div class="v">${s.nextRate == null ? 'Last day' : s.nextRate === 0 ? 'All done' : `${s.nextRate} a day`}</div></div>
       <div class="stat"><div class="k">Rest days</div><div class="v">${s.restLeft} left</div></div></div>` : ''}
@@ -591,6 +623,14 @@ function setPos(t, p, quiet) {
   if (after.status === 'done' && before.status !== 'done') { toast(`You finished ${t.name}! 🎉`); confetti(); return; }
   const mile = [75, 50, 25].find(m => pctB < m && pctA >= m);
   if (mile) { toast(mile === 50 ? `Halfway through ${t.name}!` : `${mile}% of ${t.name} done!`); confetti(); return; }
+  // Lead milestones, celebrated once per task, using the lead that survives the ghost's next move
+  t.leadMarks = t.leadMarks || [];
+  const newMarks = [1, 3].filter(m => after.banked >= m * after.r0 && !t.leadMarks.includes(m));
+  if (newMarks.length) {
+    t.leadMarks.push(...newMarks); save();
+    toast(newMarks.includes(3) ? 'Three days ahead of the ghost. Huge lead! 👻' : 'A full day ahead of the ghost! 👻');
+    confetti(); return;
+  }
   if (after.target && before.todayDone < before.target && after.todayDone >= after.target) { toast("Today's target done ✓"); confetti(); return; }
   toast(after.nextRate != null && after.nextRate < before.nextRate ? `Saved. Tomorrow is now ${after.nextRate} a day.` : 'Saved.');
 }
@@ -682,10 +722,11 @@ function settingsSheet() {
       <h4>How it works</h4>
       <p>Each morning Steady sets <b>today's target</b>: the pages left, shared across the working days before your deadline. The target stays fixed all day.</p>
       <p>Do more than the target and <b>tomorrow's number drops</b>.</p>
-      <p>The thin line on each bar shows where the plan says you should be by tonight.
+      <p>The 👻 <b>ghost</b> on each bar is the plan: where you'd be reading at a steady pace. It moves forward every morning, so stay ahead of it.
         <span class="legend" style="background:var(--ahead)"></span>ahead,
-        <span class="legend" style="background:var(--ontrack)"></span>on track,
-        <span class="legend" style="background:var(--behind)"></span>behind.</p>
+        <span class="legend" style="background:var(--ontrack)"></span>level,
+        <span class="legend" style="background:var(--behind)"></span>caught.</p>
+      <p>Once today's target is done, Steady may suggest a few extra pages to build a lead. It never asks for more than half a day extra, and stops asking once you're 3 days ahead.</p>
       <p><b>Rest days</b> are built into the plan, so taking one doesn't raise your target. If you miss days without opening the app, Steady asks whether they were rest days.</p>
       <p>Chores reset every Monday.</p>
 

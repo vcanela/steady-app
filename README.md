@@ -12,7 +12,8 @@ Live: https://vcanela.github.io/steady-app/
 - **Today's target** is fixed from the position at the start of the day:
   `ceil(pages left this morning / planned working days left)`.
 - **From tomorrow** assumes today's target is met, so it only drops when the student goes beyond it.
-- **Pace mark** on the bar: where the original plan says the student should be by tonight. Colour compares the fill with it: green ahead, teal on track, amber behind.
+- **The ghost** 👻 on the bar: where the original plan (a steady rate per working day) had the student this morning. It jumps forward one day's worth each morning, except after a rest day. The lead is shown in pages or days; colour is green when ahead, teal when level, amber when caught.
+- **Going beyond the target**: once today's target is met, the message may suggest a few extra pages to hold or build the lead. Never more than 1.5× the day's target in total, and nothing once the student is 3 days ahead. Lead milestones (1 and 3 days, measured after the ghost's next move) are celebrated once per task.
 - **Missed days**: when the app was not opened, the next launch asks whether those days were rest days.
 
 All of this lives in `stats()` in `index.html`.
