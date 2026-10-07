@@ -191,9 +191,10 @@ h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacin
 
 /* ---------- Feedback ---------- */
 .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translate(-50%, 20px);
-  opacity: 0; background: var(--text); color: var(--bg); padding: 12px 18px; border-radius: 999px; font-weight: 600;
+  opacity: 0; background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 18px; font-weight: 600;
   font-size: 15px; transition: .25s; z-index: 70; pointer-events: none; width: max-content; max-width: 90vw; text-align: center; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast .sub { display: block; margin-top: 2px; font-size: 13px; font-weight: 400; opacity: .8; }
 .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 60; }
 .confetti i { position: absolute; top: -14px; width: 8px; height: 12px; border-radius: 2px; animation: fall 1.8s ease-in forwards; }
 @keyframes fall { to { transform: translate(var(--x), 105vh) rotate(var(--r)); } }
@@ -248,6 +249,42 @@ const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); retu
 const diffDays = (a, b) => Math.round((parse(b) - parse(a)) / 864e5);
 const weekStart = s => { const d = parse(s); d.setDate(d.getDate() - (d.getDay() + 6) % 7); return ymd(d); }; // Monday
 const fmt = (s, opts = { weekday: 'short', day: 'numeric', month: 'short' }) => parse(s).toLocaleDateString('en-NZ', opts);
+
+/* ---------- Motivational phrases ----------
+   One pops up after each log, picked at random from the pool that fits
+   what just happened. Edit freely: add, remove or reword lines. */
+const PHRASES = {
+  progress: [   // some pages logged, today's target not yet reached
+    'Every page counts.', 'Pages in the bank.', 'Little by little, it adds up.',
+    'Showing up is the hard part. Done.', 'Small steps, real distance.', "That's progress.",
+    'One more step along the way.', 'The ghost noticed that.',
+  ],
+  target: [     // this log reached today's target
+    "Today's work: done.", 'Target hit. Nice work.', "That's the day sorted.",
+    'You kept your word to yourself.', 'Another day in the bank.', 'Right on pace.',
+    'Consistency looks good on you.', 'Job done. Enjoy your evening.',
+  ],
+  beyond: [     // past today's target (or reading on a rest day)
+    'Bonus pages. Future you says thanks.', 'The ghost is eating your dust.', 'Extra pages, lighter tomorrow.',
+    'Above and beyond.', "That's a strong session.", "Now that's momentum.",
+    'Building a lead.', 'You went the extra mile.',
+  ],
+  catchup: [    // behind the ghost, but logging pages
+    'Closing the gap.', 'Comebacks start like this.', 'The ghost is getting nervous.',
+    'Every page pulls you back.', "You're back in it.", 'Catching up, page by page.',
+    "That's how you turn it around.", 'One log at a time.',
+  ],
+  chore: [      // a chore ticked off
+    'Chore done. Nice one.', 'One less thing to do.', 'Ticked off.',
+    'Home looks better already.', 'Helping out counts.', 'Done and dusted.',
+  ],
+};
+let lastPhrase = '';
+function phrase(pool) {                     // random, but never the same twice in a row
+  const options = PHRASES[pool].filter(p => p !== lastPhrase);
+  lastPhrase = options[Math.floor(Math.random() * options.length)];
+  return lastPhrase;
+}
 
 /* ---------- Storage ---------- */
 const KEY = 'steady.v1';
@@ -665,8 +702,19 @@ function setPos(t, p, quiet) {
     toast(newMarks.includes(3) ? 'Three days ahead of the ghost. Huge lead! 👻' : 'A full day ahead of the ghost! 👻');
     confetti(); return;
   }
-  if (after.target && before.todayDone < before.target && after.todayDone >= after.target) { toast("Today's target done ✓"); confetti(); return; }
-  toast(after.nextRate != null && after.nextRate < before.nextRate ? `Saved. Tomorrow is now ${after.nextRate} a day.` : 'Saved.');
+  if (after.done <= before.done) { toast('Saved.'); return; }   // a correction, not progress
+
+  // A motivational phrase as the main line, with the useful fact underneath
+  const left = Math.max(0, after.target - after.todayDone);
+  const fact = after.nextRate != null && after.nextRate < before.nextRate ? `Tomorrow is now ${after.nextRate} a day.`
+             : left > 0 ? `${pl(left, 'page')} to go today.` : '';
+  if (after.target && before.todayDone < after.target && after.todayDone >= after.target) {
+    toast(phrase(after.todayDone > after.target ? 'beyond' : 'target'), "Today's target done ✓");
+    confetti(); return;
+  }
+  const pool = (!after.target || after.todayDone > after.target) ? 'beyond'
+             : after.status === 'behind' ? 'catchup' : 'progress';
+  toast(phrase(pool), fact);
 }
 
 /* ---------- Reading history ----------
@@ -793,7 +841,11 @@ function bumpChore(id, d) {
   const before = choresComplete();
   log[id] = clamp((log[id] || 0) + d, 0, c.perWeek);
   save(); render();
-  if (!before && choresComplete()) { toast('Every chore done this week! 🎉'); confetti(); }
+  if (!before && choresComplete()) { toast('Every chore done this week! 🎉'); confetti(); return; }
+  if (d > 0) {
+    const left = S.chores.reduce((a, x) => a + Math.max(0, x.perWeek - (log[x.id] || 0)), 0);
+    toast(phrase('chore'), `${pl(left, 'chore')} left this week.`);
+  }
 }
 
 /* ---------- Settings: how it works, backup and restore ---------- */
@@ -849,10 +901,11 @@ function settingsSheet() {
 
 /* ---------- Feedback ---------- */
 let toastTimer;
-function toast(text) {
+function toast(text, sub) {
   const el = $('#toast');
-  el.textContent = text; el.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  el.innerHTML = esc(text) + (sub ? `<span class="sub">${esc(sub)}</span>` : '');
+  el.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), sub ? 3200 : 2600);
 }
 function confetti() {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
