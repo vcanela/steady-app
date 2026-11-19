@@ -189,6 +189,37 @@ h2 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacin
 .hrow.missed .hnum { color: var(--muted); font-weight: 400; }
 .hrow.rest .hnote { grid-column: 2 / 4; color: var(--muted); font-size: 13px; font-style: italic; }
 
+/* ---------- Yoga ---------- */
+.round.play { color: var(--link); border-color: var(--link); }
+.flow-card { display: block; width: 100%; text-align: left; margin-top: 10px; padding: 14px 16px; border-radius: 14px;
+  border: 1px solid var(--line); background: var(--card); color: var(--text); }
+.flow-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 17px; }
+.flow-min { font-size: 14px; color: var(--muted); }
+.flow-about { display: block; margin-top: 4px; font-size: 14px; color: var(--muted); }
+.sheet.full { top: 0; border-radius: 0; padding-top: env(safe-area-inset-top); padding-bottom: 0; display: flex; flex-direction: column; }
+.player { flex: 1; display: flex; flex-direction: column; }
+.p-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 6px 0; }
+.p-top > :last-child { justify-self: end; }
+.p-step { font-size: 13px; color: var(--muted); }
+.p-main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; }
+.p-flow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.p-pose { font-size: 30px; font-weight: 700; line-height: 1.15; }
+.p-cue { margin: 0; max-width: 32ch; min-height: 2.9em; font-size: 16px; line-height: 1.45; color: var(--muted); }
+.p-ring { position: relative; width: 220px; height: 220px; margin: 12px 0 4px; }
+.p-ring svg { transform: rotate(-90deg); display: block; }
+.p-ring .bg { fill: none; stroke: var(--track); stroke-width: 10; }
+.p-ring .fg { fill: none; stroke: var(--ontrack); stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset .25s linear; }
+.p-pace { position: absolute; inset: 30px; border-radius: 50%; background: color-mix(in srgb, var(--ontrack) 16%, transparent);
+  transform: scale(.55); transition: transform 5s ease-in-out; }
+.p-pace.in { transform: scale(1); }
+.p-time { position: absolute; inset: 0; display: grid; place-items: center; font-size: 46px; font-weight: 600; }
+.p-breath, .p-next { min-height: 1.4em; font-size: 15px; color: var(--muted); }
+.p-controls { display: flex; justify-content: center; align-items: center; gap: 28px; padding: 16px 0 calc(env(safe-area-inset-bottom) + 16px); }
+.p-btn { width: 60px; height: 60px; border-radius: 50%; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  display: grid; place-items: center; padding: 0; }
+.p-btn.main { width: 80px; height: 80px; background: var(--brand); color: var(--brand-ink); border-color: var(--brand); }
+.p-done { font-size: 56px; }
+
 /* ---------- Feedback ---------- */
 .toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translate(-50%, 20px);
   opacity: 0; background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 18px; font-weight: 600;
@@ -278,7 +309,63 @@ const PHRASES = {
     'Chore done. Nice one.', 'One less thing to do.', 'Ticked off.',
     'Home looks better already.', 'Helping out counts.', 'Done and dusted.',
   ],
+  yoga: [       // a yoga flow finished
+    'Clear head, ready to focus.', 'Reset complete. Back to it.', 'Breath by breath.',
+    'Calm and steady.', 'Stretched and settled.', 'Your body says thanks.',
+    'Good for focus, good for you.', 'That was time well spent.',
+  ],
 };
+
+/* ---------- Yoga: poses and set flows ----------
+   A flow is a list of steps: [pose, seconds] or [pose, seconds, 'left'/'right'].
+   Edit freely; a flow's length is worked out from its steps. */
+const POSES = {
+  ready:      ['Get ready', 'Find a clear space and put the phone where you can see it.'],
+  breathing:  ['Easy breathing', 'Sit or stand tall. Breathe in for 4, out for 6.'],
+  mountain:   ['Mountain', 'Stand tall, feet hip-width apart, arms by your sides.'],
+  reach:      ['Upward reach', 'Arms overhead, palms facing, lengthen through your sides.'],
+  fold:       ['Forward fold', 'Hinge at the hips and hang forward. Knees soft, head heavy.'],
+  halflift:   ['Half lift', 'Hands on your shins, flat back, look forward.'],
+  plank:      ['Plank', 'Hands under shoulders, body in one straight line.'],
+  cobra:      ['Cobra', 'Lie on your front, hands under shoulders, gently lift your chest.'],
+  dog:        ['Downward dog', 'Hips high, heels reaching down, press the floor away.'],
+  child:      ["Child's pose", 'Knees wide, sit back on your heels, arms forward, forehead down.'],
+  catcow:     ['Cat-cow', 'On all fours: round your back as you breathe out, dip it as you breathe in.'],
+  thread:     ['Thread the needle', 'On all fours, slide one arm under the other and rest your shoulder down.'],
+  lowlunge:   ['Low lunge', 'Front knee over ankle, back knee down, lift your chest.'],
+  warrior1:   ['Warrior I', 'Front knee bent, back foot turned out a little, arms up.'],
+  warrior2:   ['Warrior II', 'Wide stance, front knee bent, arms out, look over your front hand.'],
+  triangle:   ['Triangle', 'Legs straight and wide, reach forward, then down to your shin.'],
+  tree:       ['Tree', 'Stand on one leg, other foot on your ankle or calf, never the knee.'],
+  bridge:     ['Bridge', 'On your back, knees bent, press through your feet and lift your hips.'],
+  twist:      ['Lying twist', 'On your back, drop both knees to one side and look the other way.'],
+  seatedfold: ['Seated fold', 'Legs out in front, hinge forward from the hips, soft back.'],
+  legswall:   ['Legs up the wall', 'Lie with your legs resting up a wall. Let everything relax.'],
+  neck:       ['Neck release', 'Tilt one ear towards your shoulder. Slow, no forcing.'],
+  shoulders:  ['Shoulder rolls', 'Roll your shoulders slowly up, back and down.'],
+  wrists:     ['Wrist circles', 'Circle your wrists both ways, then gently stretch your fingers back.'],
+  chairtwist: ['Seated twist', 'Sit tall on a chair and turn your chest to one side.'],
+  rest:       ['Rest', 'Lie on your back, arms by your sides, eyes closed. Just breathe.'],
+};
+const FLOWS = [
+  { id: 'morning', name: 'Morning wake-up', about: 'Gentle spine and hip mobility, then a sun salutation.',
+    steps: [['ready', 10], ['catcow', 50], ['child', 30], ['dog', 45], ['lowlunge', 30, 'left'], ['lowlunge', 30, 'right'],
+            ['fold', 30], ['halflift', 15], ['fold', 15], ['mountain', 20], ['reach', 20], ['fold', 15], ['plank', 20],
+            ['cobra', 20], ['dog', 40], ['fold', 20], ['reach', 20], ['mountain', 30], ['breathing', 30]] },
+  { id: 'study', name: 'Study break', about: 'Standing or at a desk: neck, shoulders, wrists and a fold.',
+    steps: [['ready', 5], ['breathing', 40], ['neck', 30, 'left'], ['neck', 30, 'right'], ['shoulders', 30], ['wrists', 30],
+            ['chairtwist', 30, 'left'], ['chairtwist', 30, 'right'], ['reach', 25], ['fold', 30], ['mountain', 30]] },
+  { id: 'winddown', name: 'Wind down', about: 'Slow floor poses for the evening. You need a wall for the last part.',
+    steps: [['ready', 10], ['child', 60], ['catcow', 45], ['thread', 45, 'left'], ['thread', 45, 'right'], ['seatedfold', 60],
+            ['twist', 45, 'left'], ['twist', 45, 'right'], ['bridge', 30], ['legswall', 90], ['rest', 120]] },
+  { id: 'strength', name: 'Stretch and strengthen', about: 'Warriors, lunges and balance: the fuller session.',
+    steps: [['ready', 10], ['mountain', 20], ['reach', 20], ['fold', 20], ['halflift', 15], ['plank', 30], ['cobra', 20], ['dog', 45],
+            ['lowlunge', 40, 'left'], ['warrior1', 40, 'left'], ['warrior2', 40, 'left'], ['triangle', 40, 'left'], ['dog', 30],
+            ['lowlunge', 40, 'right'], ['warrior1', 40, 'right'], ['warrior2', 40, 'right'], ['triangle', 40, 'right'], ['dog', 30],
+            ['tree', 30, 'left'], ['tree', 30, 'right'], ['child', 20], ['bridge', 30], ['twist', 40, 'left'], ['twist', 40, 'right'],
+            ['rest', 90], ['breathing', 30]] },
+];
+const flowSeconds = f => f.steps.reduce((a, s) => a + s[1], 0);
 let lastPhrase = '';
 function phrase(pool) {                     // random, but never the same twice in a row
   const options = PHRASES[pool].filter(p => p !== lastPhrase);
@@ -512,9 +599,10 @@ function renderChores() {
     const n = Math.min(log[c.id] || 0, c.perWeek);
     const pips = Array.from({ length: c.perWeek }, (_, i) => `<i class="pip ${i < n ? 'on' : ''}"></i>`).join('');
     return `<li class="${n >= c.perWeek ? 'complete' : ''}">
-      <button class="chore-name" data-action="edit-chore" data-id="${c.id}">${esc(c.name)}</button>
+      <button class="chore-name" data-action="edit-chore" data-id="${c.id}">${c.yoga ? '🧘 ' : ''}${esc(c.name)}</button>
       <span class="pips" aria-label="${n} of ${c.perWeek}">${pips}</span>
       <button class="round" data-action="chore-minus" data-id="${c.id}" ${n ? '' : 'disabled'} aria-label="Undo">−</button>
+      ${c.yoga ? `<button class="round play" data-action="yoga" data-id="${c.id}" aria-label="Start a yoga flow">${ICON.play}</button>` : ''}
       <button class="round plus" data-action="chore-plus" data-id="${c.id}" ${n >= c.perWeek ? 'disabled' : ''} aria-label="Done once">+</button>
     </li>`;
   }).join('');
@@ -812,6 +900,8 @@ function choreForm(c) {
     <div class="form">
       <label>Chore<input id="c-name" type="text" value="${esc(c ? c.name : '')}" placeholder="e.g. Take out the bins" autocomplete="off"></label>
       <label>Times per week<input id="c-n" type="number" inputmode="numeric" min="1" max="7" value="${c ? c.perWeek : 1}"></label>
+      <label class="check-row"><input id="c-yoga" type="checkbox" ${c && c.yoga ? 'checked' : ''}>
+        <span>Yoga: the ▶ button starts a guided, timed flow</span></label>
       <p class="error" id="c-error"></p>
       ${isNew ? '' : '<button class="btn danger" id="c-delete">Delete chore</button>'}
     </div>`, sheet => {
@@ -820,7 +910,8 @@ function choreForm(c) {
       const n = toInt(sheet.querySelector('#c-n').value);
       if (!name) { sheet.querySelector('#c-error').textContent = 'Give the chore a name.'; return; }
       if (n == null || n < 1 || n > 7) { sheet.querySelector('#c-error').textContent = 'Times per week must be from 1 to 7.'; return; }
-      if (isNew) S.chores.push({ id: uid(), name, perWeek: n }); else Object.assign(c, { name, perWeek: n });
+      const yoga = sheet.querySelector('#c-yoga').checked;
+      if (isNew) S.chores.push({ id: uid(), name, perWeek: n, yoga }); else Object.assign(c, { name, perWeek: n, yoga });
       save(); closeSheet(); render();
     };
     if (!isNew) sheet.querySelector('#c-delete').onclick = () => {
@@ -848,6 +939,178 @@ function bumpChore(id, d) {
   }
 }
 
+/* =====================================================================
+   Yoga player
+   Each pose is timed from the clock (P.endAt), not by counting ticks, so the
+   timer stays right even if the phone sleeps; on waking it moves past any
+   poses that finished in the meantime.
+   ===================================================================== */
+const ICON = {
+  play:  '<svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
+  back:  '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="5" y="6" width="2.5" height="12" rx="1"/><path d="M19 6v12l-9.5-6z"/></svg>',
+  next:  '<svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><rect x="16.5" y="6" width="2.5" height="12" rx="1"/><path d="M5 6v12l9.5-6z"/></svg>',
+};
+const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${pad(s % 60)}`; };
+const stepName = st => POSES[st[0]][0] + (st[2] ? ` (${st[2]})` : '');
+
+function flowPicker(choreId) {
+  openSheet(`<div class="sheet-head"><button class="link-btn" data-close>Cancel</button><h3>Yoga</h3><span></span></div>
+    <div class="form">
+      <p class="muted">Pick a flow. A soft chime marks each change of pose, and the screen stays on until you finish.</p>
+      ${FLOWS.map(f => `<button class="flow-card" data-flow="${f.id}">
+        <span class="flow-top"><b>${esc(f.name)}</b><span class="flow-min">${Math.round(flowSeconds(f) / 60)} min</span></span>
+        <span class="flow-about">${esc(f.about)}</span></button>`).join('')}
+      <p class="muted small">Move gently and skip anything that hurts. If your phone is on silent, the chime may be silent too.</p>
+    </div>`, sheet => {
+    sheet.querySelectorAll('[data-flow]').forEach(b =>
+      b.onclick = () => startFlow(FLOWS.find(f => f.id === b.dataset.flow), choreId));
+  });
+}
+
+/* A soft bell made with Web Audio: one note per change of pose, three at the end */
+let audio = null;
+function chime(final) {
+  if (!audio) return;
+  if (audio.state === 'suspended') audio.resume();
+  (final ? [660, 880, 1320] : [880]).forEach((freq, k) => {
+    const t0 = audio.currentTime + k * 0.22;
+    const osc = audio.createOscillator(), gain = audio.createGain();
+    osc.type = 'sine'; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 1.6);
+    osc.connect(gain); gain.connect(audio.destination);
+    osc.start(t0); osc.stop(t0 + 1.7);
+  });
+}
+
+/* Keep the screen on during a flow (iPhone releases this whenever the app is hidden) */
+let wakeLock = null;
+async function keepAwake(on) {
+  try {
+    if (on && 'wakeLock' in navigator && !wakeLock) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+  } catch { wakeLock = null; }
+}
+
+let P = null;   // the flow being played
+function startFlow(flow, choreId) {
+  // This runs inside the tap on a flow, which is what allows iPhone to play sound and keep the screen on
+  try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch { audio = null; }
+  keepAwake(true);
+  P = { flow, choreId, i: 0, endAt: 0, left: 0, paused: false, pacer: false, t0: Date.now(), timer: null };
+  openSheet(`<div class="player">
+    <div class="p-top"><button class="link-btn" id="p-end">End</button><span class="p-step" id="p-step"></span>
+      <button class="link-btn" id="p-pacer"></button></div>
+    <div class="p-main">
+      <div class="p-flow">${esc(flow.name)}</div>
+      <div class="p-pose" id="p-pose"></div>
+      <p class="p-cue" id="p-cue"></p>
+      <div class="p-ring"><svg viewBox="0 0 220 220" width="220" height="220"><circle class="bg" cx="110" cy="110" r="100"/>
+        <circle class="fg" id="p-arc" cx="110" cy="110" r="100" stroke-dasharray="${2 * Math.PI * 100}"/></svg>
+        <div class="p-pace" id="p-pace"></div><div class="p-time" id="p-time"></div></div>
+      <div class="p-breath" id="p-breath"></div>
+      <div class="p-next" id="p-next"></div>
+    </div>
+    <div class="p-controls">
+      <button class="p-btn" id="p-back" aria-label="Previous pose">${ICON.back}</button>
+      <button class="p-btn main" id="p-play" aria-label="Pause">${ICON.pause}</button>
+      <button class="p-btn" id="p-skip" aria-label="Next pose">${ICON.next}</button>
+    </div></div>`, sheet => {
+    sheet.classList.add('full');
+    sheet.querySelector('#p-end').onclick = () => { if (confirm("End this flow? It won't count towards your week.")) closeSheet(); };
+    sheet.querySelector('#p-play').onclick = togglePause;
+    sheet.querySelector('#p-back').onclick = () => goTo(Math.max(0, P.i - 1));
+    sheet.querySelector('#p-skip').onclick = () => P.i < P.flow.steps.length - 1 ? goTo(P.i + 1) : finishFlow();
+    sheet.querySelector('#p-pacer').onclick = () => { P.pacer = !P.pacer; draw(); };
+    goTo(0, true);
+    P.timer = setInterval(tick, 200);
+  }, stopFlow);
+}
+
+function goTo(i, silent) {
+  P.i = i;
+  P.left = P.flow.steps[i][1] * 1000;
+  if (!P.paused) P.endAt = Date.now() + P.left;
+  if (!silent) chime();
+  draw();
+}
+const remaining = () => P.paused ? P.left : P.endAt - Date.now();
+function togglePause() {
+  if (P.paused) { P.paused = false; P.endAt = Date.now() + P.left; }
+  else { P.left = P.endAt - Date.now(); P.paused = true; }
+  draw();
+}
+function tick() {
+  if (!P || P.paused) return;
+  const now = Date.now();
+  if (P.endAt > now) return draw();
+  const last = P.flow.steps.length - 1;
+  while (P.endAt <= now && P.i < last) { P.i++; P.endAt += P.flow.steps[P.i][1] * 1000; }
+  if (P.endAt <= now) return finishFlow();
+  chime(); draw();
+}
+
+function draw() {
+  const sheet = document.querySelector('.sheet.full');
+  if (!sheet || !P) return;
+  const q = sel => sheet.querySelector(sel);
+  const st = P.flow.steps[P.i], nx = P.flow.steps[P.i + 1];
+  const rem = Math.max(0, remaining());
+  q('#p-step').textContent = `${P.i + 1} of ${P.flow.steps.length}`;
+  q('#p-pose').textContent = stepName(st);
+  q('#p-cue').textContent = POSES[st[0]][1];
+  q('#p-time').textContent = mmss(rem);
+  q('#p-arc').style.strokeDashoffset = 2 * Math.PI * 100 * (rem / (st[1] * 1000));   // ring fills as the pose goes on
+  q('#p-next').textContent = nx ? `Next: ${stepName(nx)}` : 'Last pose';
+  q('#p-play').innerHTML = P.paused ? ICON.play : ICON.pause;
+  q('#p-play').setAttribute('aria-label', P.paused ? 'Resume' : 'Pause');
+  q('#p-pacer').textContent = P.pacer ? 'Pacer on' : 'Pacer off';
+  // Optional breathing pacer: 5 seconds in, 5 seconds out
+  const inhale = Math.floor((Date.now() - P.t0) / 5000) % 2 === 0;
+  q('#p-pace').style.display = P.pacer ? '' : 'none';
+  q('#p-pace').classList.toggle('in', inhale);
+  q('#p-breath').textContent = P.paused ? 'Paused' : P.pacer ? (inhale ? 'Breathe in' : 'Breathe out') : '';
+}
+
+function finishFlow() {
+  clearInterval(P.timer);
+  chime(true);
+  keepAwake(false);
+  const { flow, choreId, t0 } = P;
+  P = null;
+  S.yogaLog = S.yogaLog || [];
+  S.yogaLog.push({ date: currentDay, flow: flow.id, seconds: Math.round((Date.now() - t0) / 1000) });
+  // Finishing a flow ticks the yoga chore once
+  const c = S.chores.find(x => x.id === choreId);
+  const before = choresComplete();
+  if (c) {
+    const log = S.choreLog[weekStart(currentDay)] = S.choreLog[weekStart(currentDay)] || {};
+    log[c.id] = Math.min(c.perWeek, (log[c.id] || 0) + 1);
+  }
+  const weekDone = !before && choresComplete();
+  save(); render();
+  const sheet = document.querySelector('.sheet.full');
+  sheet.innerHTML = `<div class="player"><div class="p-main">
+      <div class="p-done">🧘</div>
+      <div class="p-pose">${esc(phrase('yoga'))}</div>
+      <p class="p-cue">${esc(flow.name)} done: ${pl(Math.round(flowSeconds(flow) / 60), 'minute')} of yoga.${weekDone ? ' Every chore done this week, too.' : ''}</p>
+    </div><div class="p-controls"><button class="btn primary wide" id="p-done">Done</button></div></div>`;
+  sheet.querySelector('#p-done').onclick = closeSheet;
+  confetti();
+}
+function stopFlow() {
+  if (P) { clearInterval(P.timer); P = null; }
+  keepAwake(false);
+}
+// Back from the lock screen or another app: take the screen lock again, wake the audio, catch the timer up
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && P) { keepAwake(true); if (audio) audio.resume(); tick(); }
+});
+
 /* ---------- Settings: how it works, backup and restore ---------- */
 const toCode = s => { const b = new TextEncoder().encode(JSON.stringify(s)); let bin = ''; b.forEach(x => bin += String.fromCharCode(x)); return 'STEADY1:' + btoa(bin); };
 const fromCode = code => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(code.trim().replace(/^STEADY1:/, '')), c => c.charCodeAt(0))));
@@ -865,6 +1128,7 @@ function settingsSheet() {
       <p>Once today's target is done, Steady may suggest a few extra pages to build a lead. It never asks for more than half a day extra, and stops asking once you're 3 days ahead.</p>
       <p><b>Rest days</b> are built into the plan, so taking one doesn't raise your target. If you miss days without opening the app, Steady asks whether they were rest days.</p>
       <p>Chores reset every Monday.</p>
+      <p><b>Yoga</b>: add a chore and tick "Yoga". Its ▶ button opens guided flows with a timer and a soft chime at each change of pose. Finishing a flow ticks the chore. The screen stays on during a flow; if your phone is on silent, the chime may be too.</p>
 
       <h4>Backup</h4>
       <p>Your data lives only on this phone. Removing Steady from the home screen deletes it, so copy a backup code now and then and keep it somewhere safe, such as Notes.</p>
@@ -955,6 +1219,7 @@ document.addEventListener('click', e => {
     case 'edit-chore': return choreForm(S.chores.find(c => c.id === id));
     case 'chore-plus': return bumpChore(id, 1);
     case 'chore-minus': return bumpChore(id, -1);
+    case 'yoga': return flowPicker(id);
     case 'settings': return settingsSheet();
   }
 });

@@ -19,6 +19,14 @@ Live: https://vcanela.github.io/steady-app/
 
 All of this lives in `stats()` in `index.html`.
 
+## Yoga
+
+A weekly chore with "Yoga" ticked gets a ▶ button that opens four set flows (5 to 15 minutes). The player shows each pose with a one-line cue, a countdown ring, the next pose, pause/back/skip and an optional breathing pacer, with a soft Web Audio chime at each change (no voice, no vibration: iPhone web apps can't vibrate). Finishing a flow ticks the chore and is recorded in `S.yogaLog`; ending early doesn't count.
+
+- Poses and flows live in `POSES` and `FLOWS` near the top of the script; a flow's length is worked out from its steps.
+- Timing comes from the clock (`P.endAt`), not from counting ticks, so the timer survives the phone sleeping and catches up when it wakes.
+- The screen is kept on with the Screen Wake Lock API, requested inside the tap that starts a flow and again whenever the app comes back to the foreground.
+
 ## Files
 
 - `index.html`: the whole app (state in `localStorage` under `steady.v1`)
